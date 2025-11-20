@@ -1,0 +1,43 @@
+name: Deploy to dev
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to dev server via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEV_SSH_HOST }}
+          port: ${{ secrets.DEV_SSH_PORT }}
+          username: ${{ secrets.DEV_SSH_USER }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          passphrase: ${{ secrets.DEV_SSH_PASSPHRASE }}
+          script: |
+            set -euo pipefail
+
+            echo "> cd /var/www/bitrix24"
+            cd /var/www/bitrix24
+
+            echo "> git fetch --all"
+            git fetch --all
+
+            echo "> git reset --hard origin/dev"
+            git reset --hard origin/dev
+
+            echo "> docker compose pull"
+            docker compose -f docker-compose.yml -f docker-compose.override.yml pull || true
+
+            echo "> docker compose up -d --build --remove-orphans"
+            docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build --remove-orphans
+
+            echo "> docker system prune -f"
+            docker system prune -f || true
